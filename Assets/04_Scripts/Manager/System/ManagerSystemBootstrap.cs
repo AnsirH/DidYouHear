@@ -56,9 +56,11 @@ namespace DidYouHear.Manager.System
         public GhostManager ghostManager;
         public StonePool stonePool;
         
+        [Header("Manager System Components")]
+        [SerializeField] private ManagerInitializer managerInitializer;
+        [SerializeField] private SceneManagerController sceneManagerController;
+        
         // 매니저 시스템 컴포넌트들
-        private ManagerInitializer managerInitializer;
-        private SceneManagerController sceneManagerController;
         private DependencyContainer dependencyContainer;
         
         // 초기화 상태
@@ -66,6 +68,9 @@ namespace DidYouHear.Manager.System
         
         private void Awake()
         {
+            // 컴포넌트 참조 검증
+            ValidateComponents();
+            
             // 부트스트랩 초기화
             InitializeBootstrap();
         }
@@ -79,22 +84,43 @@ namespace DidYouHear.Manager.System
         }
         
         /// <summary>
+        /// 컴포넌트 참조 검증
+        /// </summary>
+        private void ValidateComponents()
+        {
+            // 필수 컴포넌트 검증
+            if (managerInitializer == null)
+            {
+                Debug.LogError("ManagerSystemBootstrap: ManagerInitializer component not assigned in Inspector!");
+                return;
+            }
+            
+            if (enableSceneManagerIntegration && sceneManagerController == null)
+            {
+                Debug.LogError("ManagerSystemBootstrap: SceneManagerController component not assigned in Inspector!");
+                return;
+            }
+            
+            // 설정 적용
+            managerInitializer.enableDebugLogging = enableDebugLogging;
+            managerInitializer.autoInitializeOnStart = false; // 수동으로 제어
+            
+            if (sceneManagerController != null)
+            {
+                sceneManagerController.enableDebugLogging = enableDebugLogging;
+            }
+            
+            if (enableDebugLogging)
+            {
+                Debug.Log("ManagerSystemBootstrap: Components validated successfully");
+            }
+        }
+        
+        /// <summary>
         /// 부트스트랩 초기화
         /// </summary>
         private void InitializeBootstrap()
         {
-            // ManagerInitializer 생성 및 설정
-            managerInitializer = gameObject.AddComponent<ManagerInitializer>();
-            managerInitializer.enableDebugLogging = enableDebugLogging;
-            managerInitializer.autoInitializeOnStart = false; // 수동으로 제어
-            
-            // SceneManagerController 생성 및 설정
-            if (enableSceneManagerIntegration)
-            {
-                sceneManagerController = gameObject.AddComponent<SceneManagerController>();
-                sceneManagerController.enableDebugLogging = enableDebugLogging;
-            }
-            
             // DependencyContainer 생성
             dependencyContainer = new DependencyContainer();
             
@@ -252,6 +278,75 @@ namespace DidYouHear.Manager.System
         }
         
         /// <summary>
+        /// 씬 전환 후 매니저 참조 업데이트
+        /// </summary>
+        public void RefreshManagerReferences()
+        {
+            if (enableDebugLogging)
+            {
+                Debug.Log("ManagerSystemBootstrap: Refreshing manager references after scene change...");
+            }
+            
+            // 기존 참조가 null이거나 파괴된 경우 다시 찾기
+            if (gameManager == null) gameManager = FindObjectOfType<GameManager>();
+            if (inputManager == null) inputManager = FindObjectOfType<InputManager>();
+            if (audioManager == null) audioManager = FindObjectOfType<AudioManager>();
+            if (eventManager == null) eventManager = FindObjectOfType<EventManager>();
+            if (ghostManager == null) ghostManager = FindObjectOfType<GhostManager>();
+            if (stonePool == null) stonePool = FindObjectOfType<StonePool>();
+            
+            // 새로운 매니저들을 ManagerInitializer에 다시 등록
+            var managers = new IManager[] { gameManager, inputManager, audioManager, eventManager, ghostManager, stonePool };
+            
+            foreach (var manager in managers)
+            {
+                if (manager != null)
+                {
+                    // 이미 등록되어 있는지 확인 후 등록
+                    if (!managerInitializer.GetManagers().Contains(manager))
+                    {
+                        managerInitializer.RegisterManager(manager);
+                        
+                        if (enableDebugLogging)
+                        {
+                            Debug.Log($"ManagerSystemBootstrap: Re-registered {manager.GetType().Name}");
+                        }
+                    }
+                }
+            }
+            
+            // DependencyContainer 업데이트
+            UpdateDependencyContainer();
+            
+            if (enableDebugLogging)
+            {
+                Debug.Log("ManagerSystemBootstrap: Manager references refreshed successfully");
+            }
+        }
+        
+        /// <summary>
+        /// DependencyContainer 업데이트
+        /// </summary>
+        private void UpdateDependencyContainer()
+        {
+            // 기존 등록 해제
+            dependencyContainer.Clear();
+            
+            // 새로 등록
+            if (gameManager != null) dependencyContainer.RegisterSingleton(gameManager);
+            if (inputManager != null) dependencyContainer.RegisterSingleton(inputManager);
+            if (audioManager != null) dependencyContainer.RegisterSingleton(audioManager);
+            if (eventManager != null) dependencyContainer.RegisterSingleton(eventManager);
+            if (ghostManager != null) dependencyContainer.RegisterSingleton(ghostManager);
+            if (stonePool != null) dependencyContainer.RegisterSingleton(stonePool);
+            
+            if (enableDebugLogging)
+            {
+                Debug.Log($"ManagerSystemBootstrap: Updated DependencyContainer with {dependencyContainer.GetRegisteredServices().Count} services");
+            }
+        }
+        
+        /// <summary>
         /// 매니저 이벤트 구독
         /// </summary>
         private void SubscribeToManagerEvents()
@@ -383,6 +478,23 @@ namespace DidYouHear.Manager.System
             
             // 시스템 재시작
             StartManagerSystem();
+        }
+        
+        /// <summary>
+        /// Inspector에서 컴포넌트 할당 확인 (에디터 전용)
+        /// </summary>
+        private void OnValidate()
+        {
+            // 에디터에서 컴포넌트 참조가 변경될 때 실행
+            if (managerInitializer == null && enableDebugLogging)
+            {
+                Debug.LogWarning("ManagerSystemBootstrap: ManagerInitializer component is not assigned in Inspector!");
+            }
+            
+            if (enableSceneManagerIntegration && sceneManagerController == null && enableDebugLogging)
+            {
+                Debug.LogWarning("ManagerSystemBootstrap: SceneManagerController component is not assigned in Inspector!");
+            }
         }
         
         /// <summary>

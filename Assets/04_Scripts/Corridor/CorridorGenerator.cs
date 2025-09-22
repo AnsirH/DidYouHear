@@ -30,6 +30,10 @@ namespace DidYouHear.Corridor
         [Header("Generation Settings")]
         [SerializeField] private int seed = 0;
         
+        [Header("Visualization Settings")]
+        [SerializeField] private bool enablePathVisualization = true;
+        [SerializeField] private GridPathVisualizer pathVisualizer;
+        
         private List<CorridorPiece> generatedCorridors = new List<CorridorPiece>();
         private int currentCorridorIndex = 0;
         private bool isGenerating = false;
@@ -128,6 +132,13 @@ namespace DidYouHear.Corridor
                 yield break;
             }
             
+            // 경로 시각화 (옵션)
+            if (enablePathVisualization && pathVisualizer != null)
+            {
+                pathVisualizer.VisualizePath(generatedPath, gridSize);
+                yield return new WaitForSeconds(2f); // 시각화 확인 시간
+            }
+            
             // 생성된 경로를 바탕으로 복도 생성
             yield return StartCoroutine(CreateCorridorsFromPath());
             
@@ -188,7 +199,7 @@ namespace DidYouHear.Corridor
                 
                 // 다음 방향 결정
                 Vector2Int nextDir = DetermineNextDirection(currentDir);
-                Vector2Int nextPos = currentPos + nextDir;
+                Vector2Int nextPos = currentPos + currentDir;
                 
                 // 그리드 경계 및 충돌 검사
                 if (IsValidGridPosition(nextPos) && !gridOccupied[nextPos.x, nextPos.y])
@@ -208,6 +219,7 @@ namespace DidYouHear.Corridor
                     currentPos = nextPos;
                     currentDir = nextDir;
                     generatedCount++;
+                    attempts = 0;
                 }
                 else
                 {
@@ -242,6 +254,7 @@ namespace DidYouHear.Corridor
                         currentPos = nextPos;
                         currentDir = nextDir;
                         generatedCount++;
+                        attempts = 0;
                     }
                     else
                     {
@@ -353,19 +366,19 @@ namespace DidYouHear.Corridor
                 // 직진 방향 - 직진 복도 선택
                 return Random.Range(0f, 1f) < 0.5f ? CorridorType.Classroom : CorridorType.ClassroomBathroom;
             }
-            else if (new Vector2Int(currentDirection.y, -currentDirection.x) == nextDirection) 
+            else if (GetRelativeRightDirection(currentDirection) == nextDirection) 
             {
                 // 우회전 방향
                 return CorridorType.RightCorner;
             }
-            else if (new Vector2Int(-currentDirection.y, currentDirection.x) == nextDirection)
+            else if (GetRelativeLeftDirection(currentDirection) == nextDirection)
             {
                 // 좌회전 방향
                 return CorridorType.LeftCorner;
             }
             else
             {
-                return CorridorType.End;
+                return Random.Range(0f, 1f) < 0.5f ? CorridorType.Classroom : CorridorType.ClassroomBathroom;
             }
         }
                 
@@ -589,6 +602,35 @@ namespace DidYouHear.Corridor
             Debug.Log($"Straight Count: {straightCount} ({straightRatio:P1})");
             Debug.Log($"Target Corner Ratio: {cornerRatio:P1}");
             Debug.Log($"Event-Eligible Corridors: {eventEligibleCorridors.Count}");
+        }
+        
+        /// <summary>
+        /// 경로 시각화 설정
+        /// </summary>
+        public void SetPathVisualizationEnabled(bool enabled)
+        {
+            enablePathVisualization = enabled;
+            
+            if (pathVisualizer != null)
+            {
+                pathVisualizer.SetVisualizationEnabled(enabled);
+            }
+        }
+        
+        /// <summary>
+        /// 현재 생성된 경로 반환 (시각화용)
+        /// </summary>
+        public List<GridPath> GetGeneratedPath()
+        {
+            return new List<GridPath>(generatedPath);
+        }
+        
+        /// <summary>
+        /// 그리드 크기 반환
+        /// </summary>
+        public int GetGridSize()
+        {
+            return gridSize;
         }
     }
 }

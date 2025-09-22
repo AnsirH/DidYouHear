@@ -140,6 +140,9 @@ namespace DidYouHear.Manager.System
                 Debug.Log($"SceneManagerController: Scene loaded: {scene.name}");
             }
             
+            // 매니저 참조 업데이트 (씬 전환 후 새로 생성된 매니저들 찾기)
+            RefreshManagerReferences();
+            
             // 이전 씬의 매니저들 비활성화
             DeactivateAllManagers();
             
@@ -152,6 +155,33 @@ namespace DidYouHear.Manager.System
             // 씬 타입 변경 이벤트 발생
             var sceneType = GetSceneType(scene.name);
             OnSceneTypeChanged?.Invoke(sceneType);
+        }
+        
+        /// <summary>
+        /// 씬 전환 후 매니저 참조 업데이트
+        /// </summary>
+        private void RefreshManagerReferences()
+        {
+            if (enableDebugLogging)
+            {
+                Debug.Log("SceneManagerController: Refreshing manager references after scene change...");
+            }
+            
+            // ManagerSystemBootstrap 찾기
+            var bootstrap = FindObjectOfType<ManagerSystemBootstrap>();
+            if (bootstrap != null)
+            {
+                bootstrap.RefreshManagerReferences();
+                
+                if (enableDebugLogging)
+                {
+                    Debug.Log("SceneManagerController: Manager references refreshed via bootstrap");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("SceneManagerController: ManagerSystemBootstrap not found! Cannot refresh manager references.");
+            }
         }
         
         /// <summary>
